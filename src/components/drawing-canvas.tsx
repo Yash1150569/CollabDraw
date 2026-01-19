@@ -8,14 +8,14 @@ type DrawingCanvasProps = {
   drawOptions: DrawOptions;
   onNewPath: (path: Path) => void;
   history: Path[];
-  externalPath: Path | null;
+  tool: 'brush' | 'eraser';
 };
 
 export default function DrawingCanvas({
   drawOptions,
   onNewPath,
   history,
-  externalPath,
+  tool,
 }: DrawingCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -25,8 +25,7 @@ export default function DrawingCanvas({
     handleMouseUp,
     handleMouseLeave,
     redrawCanvas,
-    drawExternalPath
-  } = useDrawing(canvasRef, drawOptions, onNewPath);
+  } = useDrawing(canvasRef, drawOptions, onNewPath, tool);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -50,12 +49,6 @@ export default function DrawingCanvas({
   useEffect(() => {
     redrawCanvas(history);
   }, [history, redrawCanvas]);
-  
-  useEffect(() => {
-    if (externalPath) {
-      drawExternalPath(externalPath);
-    }
-  }, [externalPath, drawExternalPath]);
 
   return (
     <canvas

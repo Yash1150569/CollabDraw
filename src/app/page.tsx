@@ -33,7 +33,6 @@ export default function Home() {
 
   // State for simulating other users' actions
   const [otherUserCursors, setOtherUserCursors] = useState<Record<string, Point>>(MOCK_OTHER_CURSORS);
-  const [externalPath, setExternalPath] = useState<Path | null>(null);
 
   const currentUser = useMemo(() => users.find(u => u.id === '1'), [users]);
 
@@ -56,28 +55,51 @@ export default function Home() {
 
   const handleNewPath = useCallback((path: Path) => {
     // In a real app, this would be emitted via WebSockets
-    console.log('New path drawn, would emit to server:', path);
     setDrawingHistory(prev => [...prev, path]);
     setRedoStack([]); // Clear redo stack on new action
   }, []);
 
-  const handleUndo = () => {
-    // In a real app, this would send an 'undo' event to the server
-    if (drawingHistory.length === 0) return;
-    const lastPath = drawingHistory[drawingHistory.length - 1];
-    setDrawingHistory(drawingHistory.slice(0, -1));
-    setRedoStack(prev => [...prev, lastPath]);
-    console.log('Undo action, would emit to server');
-  };
+  const handleUndo = useCallback(() => {
+    setDrawingHistory(prevHistory => {
+        if (prevHistory.length === 0) {
+            return prevHistory;
+        }
+        const newHistory = prevHistory.slice(0, -1);
+        const lastPath = prevHistory[prevHistory.length - 1];
+        setRedoStack(prevRedoStack => [...prevRedoStack, lastPath]);
+        return newHistory;
+    });
+  }, []);
 
-  const handleRedo = () => {
-    // In a real app, this would send a 'redo' event to the server
-    if (redoStack.length === 0) return;
-    const lastRedoPath = redoStack[redoStack.length - 1];
-    setRedoStack(redoStack.slice(0, -1));
-    setDrawingHistory(prev => [...prev, lastRedoPath]);
-    console.log('Redo action, would emit to server');
-  };
+  const handleRedo = useCallback(() => {
+    setRedoStack(prevRedoStack => {
+        if (prevRedoStack.length === 0) {
+            return prevRedoStack;
+        }
+        const newRedoStack = prevRedoStack.slice(0, -1);
+        const path_to_redo = prevRedoStack[prevRedoStack.length - 1];
+        setDrawingHistory(prevHistory => [...prevHistory, path_to_redo]);
+        return newRedoStack;
+    });
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key === 'z') {
+          e.preventDefault();
+          handleUndo();
+        } else if (e.key === 'y') {
+          e.preventDefault();
+          handleRedo();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [handleUndo, handleRedo]);
 
   const handleColorChange = (color: string) => {
     setTool('brush');
@@ -87,11 +109,6 @@ export default function Home() {
   const handleStrokeWidthChange = (strokeWidth: number) => {
     setDrawOptions(prev => ({ ...prev, strokeWidth }));
   };
-
-  const effectiveDrawOptions = useMemo(() => ({
-    ...drawOptions,
-    color: tool === 'eraser' ? '#F0F0F0' : drawOptions.color, // Eraser uses background color
-  }), [tool, drawOptions]);
 
   // TODO: Implement WebSocket connection in a useEffect hook here
   // It would manage users, receive drawing data, and update states.
@@ -118,10 +135,10 @@ export default function Home() {
       </div>
 
       <DrawingCanvas
-        drawOptions={effectiveDrawOptions}
+        drawOptions={drawOptions}
         onNewPath={handleNewPath}
         history={drawingHistory}
-        externalPath={externalPath}
+        tool={tool}
       />
       
       <UserCursors 
@@ -129,13 +146,6 @@ export default function Home() {
         users={users} 
         currentUserId={currentUser?.id || ''}
       />
-
-      <div className="absolute bottom-4 left-4 z-10 bg-card p-2 rounded-lg shadow-md text-xs text-muted-foreground">
-        <p>User: {currentUser?.name}</p>
-        <p>Tool: {tool}</p>
-        <p>Color: {drawOptions.color}</p>
-        <p>Stroke: {drawOptions.strokeWidth}</p>
-      </div>
     </main>
   );
 }

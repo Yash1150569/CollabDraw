@@ -11,6 +11,7 @@ export type DrawOptions = {
 export type Path = {
   points: Point[];
   options: DrawOptions;
+  tool: 'brush' | 'eraser';
 };
 
 export type User = {

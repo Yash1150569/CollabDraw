@@ -6,7 +6,8 @@ import type { DrawOptions, Path, Point } from '@/types/drawing';
 export function useDrawing(
   canvasRef: RefObject<HTMLCanvasElement>,
   options: DrawOptions,
-  onNewPath: (path: Path) => void
+  onNewPath: (path: Path) => void,
+  tool: 'brush' | 'eraser'
 ) {
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentPath, setCurrentPath] = useState<Point[]>([]);
@@ -31,7 +32,14 @@ export function useDrawing(
     
     ctx.beginPath();
     ctx.moveTo(point.x, point.y);
-    ctx.strokeStyle = options.color;
+    
+    if (tool === 'eraser') {
+      ctx.globalCompositeOperation = 'destination-out';
+    } else {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.strokeStyle = options.color;
+    }
+
     ctx.lineWidth = options.strokeWidth;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
@@ -51,7 +59,7 @@ export function useDrawing(
 
   const finishDrawing = () => {
     if (currentPath.length > 1) {
-      onNewPath({ points: currentPath, options });
+      onNewPath({ points: currentPath, options, tool });
     }
     setCurrentPath([]);
     setIsDrawing(false);
@@ -82,10 +90,17 @@ export function useDrawing(
   const drawPath = useCallback((ctx: CanvasRenderingContext2D, path: Path) => {
     if (path.points.length < 2) return;
     
+    ctx.save();
     ctx.beginPath();
     ctx.moveTo(path.points[0].x, path.points[0].y);
     
-    ctx.strokeStyle = path.options.color;
+    if (path.tool === 'eraser') {
+      ctx.globalCompositeOperation = 'destination-out';
+    } else {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.strokeStyle = path.options.color;
+    }
+
     ctx.lineWidth = path.options.strokeWidth;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
@@ -94,6 +109,7 @@ export function useDrawing(
       ctx.lineTo(path.points[i].x, path.points[i].y);
     }
     ctx.stroke();
+    ctx.restore();
   }, []);
 
   const redrawCanvas = useCallback((history: Path[]) => {
@@ -105,18 +121,11 @@ export function useDrawing(
     history.forEach(path => drawPath(ctx, path));
   }, [canvasRef, getCanvasContext, drawPath]);
 
-  const drawExternalPath = useCallback((path: Path) => {
-    const ctx = getCanvasContext();
-    if (!ctx) return;
-    drawPath(ctx, path);
-  }, [getCanvasContext, drawPath]);
-
   return {
     handleMouseDown,
     handleMouseMove,
     handleMouseUp,
     handleMouseLeave,
     redrawCanvas,
-    drawExternalPath,
   };
 }
