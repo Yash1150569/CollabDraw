@@ -63,5 +63,13 @@ io.on("connection", socket => {
   });
 });
 
-const PORT = process.env.PORT || 3000;
+const getArg = (argName) => {
+    const argIndex = process.argv.indexOf(argName);
+    if (argIndex !== -1 && process.argv.length > argIndex + 1) {
+        return process.argv[argIndex + 1];
+    }
+    return null;
+};
+
+const PORT = getArg('--port') || process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`Server running on :${PORT}`));
