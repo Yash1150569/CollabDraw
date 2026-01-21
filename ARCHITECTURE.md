@@ -1,65 +1,63 @@
-# CollabDraw Architecture Document
+# CollabDraw Architecture Document (v2)
 
-This document outlines the architecture for the **CollabDraw** real-time collaborative drawing application, built with Next.js.
+This document outlines the architecture for the **CollabDraw** real-time collaborative drawing application, refactored to a dedicated client-server model.
 
 ## 1. Project Overview
 
-CollabDraw is a multi-user drawing application where participants can draw simultaneously on a shared canvas. The application is designed to be highly interactive, providing a seamless and real-time collaborative experience.
+CollabDraw is a multi-user drawing application where participants can draw simultaneously on a shared, synchronized canvas. The architecture is designed to be simple, robust, and authoritative, ensuring a consistent experience for all users.
 
 ## 2. Tech Stack
 
--   **Frontend Framework**: Next.js 14 (App Router)
--   **Language**: TypeScript
--   **Styling**: Tailwind CSS with shadcn/ui components for a modern, accessible, and professionally designed user interface.
--   **Icons**: `lucide-react` for clean and simple iconography.
--   **Real-time Layer**: `socket.io-client` for frontend communication with a proposed WebSocket backend.
+-   **Backend**: Node.js with Express.
+-   **Real-time Layer**: Socket.io for WebSocket communication.
+-   **Frontend**: Vanilla HTML, CSS, and JavaScript. No frameworks.
+-   **Client-Server Communication**: The Express server serves the static client files and establishes a Socket.io connection.
 
-## 3. Frontend Architecture
+## 3. Backend Architecture (`server/`)
 
-The frontend is structured using the Next.js App Router paradigm, prioritizing Server Components where possible, with Client Components used for interactive UI.
+The backend is authoritative, meaning it holds the canonical state of the application and validates all actions.
 
--   **`app/page.tsx`**: The main entry point of the application. It is a Client Component responsible for:
-    -   Managing the overall application state (e.g., selected tool, color, stroke width, user list).
-    -   Orchestrating the different UI components (`Toolbar`, `DrawingCanvas`, `UserList`).
-    -   Initializing the WebSocket connection and handling real-time events.
+-   **`server.js`**: The main entry point. It sets up an Express server to serve the `client/` directory and initializes Socket.io. It handles all WebSocket events, delegating state management to the appropriate `Room` instance.
+-   **`rooms.js`**: Manages drawing sessions (rooms). It contains a `Room` class that encapsulates the state and logic for a single canvas, including user management and drawing history.
+-   **`drawing-state.js`**: The core of the state logic. The `DrawingState` class manages the `historyStack` and `redoStack` for all drawing operations. This is central to implementing global, conflict-safe undo/redo.
 
--   **`components/`**: Contains reusable React components.
-    -   `drawing-canvas.tsx`: Renders the HTML `<canvas>` element and handles user input for drawing. It uses the `useDrawing` hook to manage all canvas operations.
-    -   `toolbar.tsx`: Provides the UI for selecting drawing tools (brush, eraser), colors, stroke width, and triggering undo/redo actions.
-    -   `user-list.tsx`: Displays the list of currently active users in the session.
-    -   `user-cursors.tsx`: Renders indicators for other users' cursor positions on the canvas.
+## 4. Frontend Architecture (`client/`)
 
--   **`hooks/`**: Contains custom React hooks for encapsulating complex logic.
-    -   `use-drawing.ts`: The core of the drawing functionality. This hook abstracts away all direct HTML5 Canvas API interactions. It manages drawing paths, handling mouse events (`mousedown`, `mousemove`, `mouseup`), and redrawing the canvas based on a history of operations. This design keeps the canvas logic decoupled from the React components and the real-time layer.
+The frontend is built with plain web technologies for simplicity and performance.
 
-## 4. Canvas & Drawing Logic
+-   **`index.html`**: The single HTML file containing the page structure: a `<canvas>`, a toolbar for controls, and containers for user lists and cursors.
+-   **`style.css`**: Provides all styling for the application.
+-   **`main.js`**: The main application script. It initializes the UI, sets up event listeners for the toolbar, and establishes the WebSocket connection. It acts as the orchestrator for the client-side application.
+-   **`websocket.js`**: A dedicated module to encapsulate all Socket.io communication logic, providing a clean API for sending and receiving events.
+-   **`canvas.js`**: Manages all HTML Canvas API interactions, including drawing paths, handling pointer events, and redrawing the canvas based on the history received from the server.
 
--   **Path Optimization**: Drawing operations are captured as a series of points (`{x, y}`). For smooth drawing, paths are rendered in real-time on `mousemove`. Only the completed path is "committed" to the history upon `mouseup`.
--   **Data Structure**: A single drawing operation (a path) is stored as an object containing an array of points and the drawing options used (color, stroke width). Example: `{ points: [...], options: { color: '#ff0000', strokeWidth: 5 } }`.
--   **Efficient Redrawing**: To handle undo/redo or to render state received from the server, the canvas is cleared and the entire history of drawing operations is re-played in order. This ensures perfect state consistency across all clients.
+## 5. Data Flow & Protocol
 
-## 5. Backend & Real-time Synchronization (Proposed)
+The system uses an event-driven, operational-transform-inspired model.
 
-The current scaffold simulates real-time functionality on the client-side. For true multi-user collaboration, a dedicated backend is required.
+1.  A user's pointer event on the canvas is captured.
+2.  The `canvas.js` script converts this into a `stroke` object.
+3.  The `stroke` object is sent to the server via WebSocket (`"stroke"` event).
+    -   **Protocol**: A stroke is a JSON object: `{ id, path: [{x, y}], tool, options: { color, width } }`
+4.  The server receives the stroke, adds it to the room's authoritative history.
+5.  The server broadcasts the stroke to all other clients in the room.
+6.  Receiving clients append the stroke to their local history and draw it on their canvas.
 
--   **Recommended Technology**: A stateful Node.js server running **Socket.io**. Serverless environments (like Vercel's default API routes) are not suitable for maintaining persistent WebSocket connections. Alternatively, a third-party real-time service like Ably or Pusher could be used.
+## 6. Conflict Resolution & Synchronization
 
--   **Server Responsibilities**:
-    1.  **Room Management**: Isolate drawing sessions by managing rooms. Users joining the same room can collaborate.
-    2.  **Event Broadcasting**: Relay drawing events (`start-drawing`, `drawing`, `end-drawing`) from one client to all other clients in the same room.
-    3.  **User Presence**: Track connected users and broadcast cursor position updates.
-    4.  **Centralized State**: Maintain the canonical (authoritative) state of the canvas, including the full drawing history.
+**Strategy: Operation-based, server-ordered model.**
 
-## 6. Global Undo/Redo (Proposed Architecture)
+-   The canvas state is simply a visual replay of the stroke history array.
+-   The server is the single source of truth for the order of operations. Strokes are added to the history in the order they are received.
+-   There is no "locking" of canvas regions. Strokes can overlap. The last one drawn (based on server order) appears on top.
+-   This model is deterministic, simple to implement, and guarantees that all clients will eventually converge to the exact same state.
 
-The global undo/redo feature is a complex requirement that necessitates a centralized state manager on the server.
+## 7. Global Undo/Redo
 
-1.  The Node.js server maintains two arrays for each room: `historyStack` and `redoStack`.
-2.  When a user finishes drawing a path, the client sends the complete path object to the server. The server pushes this object onto the `historyStack` and clears the `redoStack`.
-3.  A user client sends an `undo-request` event to the server.
-4.  The server pops the last operation from `historyStack` and pushes it onto `redoStack`.
-5.  The server then broadcasts a `canvas-state` event to **all clients** in the room. This event contains the entire updated `historyStack`.
-6.  Upon receiving the `canvas-state` event, each client clears its local canvas and redraws the scene from scratch using the authoritative history provided by the server. This guarantees that all users see the exact same canvas state.
-7.  A `redo-request` event works similarly, moving an operation from `redoStack` back to `historyStack` and broadcasting the new state.
+The server-authoritative model makes global undo/redo straightforward and robust.
 
-This server-authoritative approach is crucial for preventing desynchronization and resolving conflicts in stateful operations like undo/redo.
+1.  A client sends an `"undo"` event to the server.
+2.  The server's `DrawingState` pops the last operation from its `historyStack` and pushes it onto the `redoStack`. This action is global, regardless of which user created the stroke.
+3.  The server **broadcasts the entire, updated history** to all clients via a `"history-update"` event.
+4.  Each client, upon receiving the new history, **clears its canvas completely and redraws the scene** from scratch by replaying the updated history array.
+5.  This ensures perfect synchronization and consistency across all clients after an undo or redo operation.
