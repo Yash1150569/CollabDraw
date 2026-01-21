@@ -1,26 +1,38 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>CollabDraw</title>
-    <link rel="stylesheet" href="style.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="style.css" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+        rel="stylesheet"
+    />
 </head>
 <body>
+
     <div id="toolbar">
         <button id="brush-tool" class="tool-btn active" title="Brush">🎨</button>
         <button id="eraser-tool" class="tool-btn" title="Eraser">🧼</button>
+
         <div class="separator"></div>
+
         <div id="color-picker" class="color-picker"></div>
+
         <div class="separator"></div>
+
         <div class="stroke-slider-container">
-            <input type="range" id="stroke-width" min="1" max="50" value="5">
+            <input type="range" id="stroke-width" min="1" max="50" value="5" />
             <span id="stroke-width-label">5</span>
         </div>
+
         <div class="separator"></div>
+
         <button id="undo-btn" class="tool-btn" title="Undo (Ctrl+Z)">↩️</button>
         <button id="redo-btn" class="tool-btn" title="Redo (Ctrl+Y)">↪️</button>
     </div>
@@ -29,14 +41,20 @@
         <p>Online Users</p>
         <div id="user-list"></div>
     </div>
-    
+
     <div id="cursors-container"></div>
 
+    <!-- ✅ CANVAS ID MATCHES canvas.js -->
     <canvas id="drawing-canvas"></canvas>
 
-    <script src="/socket.io/socket.io.js"></script>
-    <script src="canvas.js"></script>
+    <!-- ✅ LOAD SOCKET.IO FROM BACKEND (3000) -->
+    <script src="http://localhost:3000/socket.io/socket.io.js"></script>
+
+    <!-- ✅ CORRECT SCRIPT ORDER -->
     <script src="websocket.js"></script>
+    <script src="canvas.js"></script>
     <script src="main.js"></script>
+
 </body>
 </html>
+
