@@ -12,6 +12,7 @@ const io = new Server(server, { cors: { origin: "*" } });
 app.use(express.static(path.join(__dirname, '../client')));
 
 io.on("connection", socket => {
+  let currentRoomId = null;
   const user = {
     id: socket.id,
     name: `User-${socket.id.substring(0, 4)}`,
@@ -19,6 +20,7 @@ io.on("connection", socket => {
   };
 
   socket.on("join-room", roomId => {
+    currentRoomId = roomId;
     const room = getRoom(roomId);
     socket.join(roomId);
     room.addUser(user);
@@ -51,9 +53,12 @@ io.on("connection", socket => {
     });
 
     socket.on("disconnect", () => {
-      room.removeUser(socket.id);
-      io.to(roomId).emit("user-left", socket.id);
-      io.to(roomId).emit("users-update", room.users());
+      if (currentRoomId) {
+        const room = getRoom(currentRoomId);
+        room.removeUser(socket.id);
+        io.to(currentRoomId).emit("user-left", socket.id);
+        io.to(currentRoomId).emit("users-update", room.users());
+      }
     });
   });
 });
